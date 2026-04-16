@@ -1,10 +1,7 @@
 import { DynamicStructuredTool } from '@langchain/core/tools';
 import { z } from 'zod';
-import { api, stripFieldsDeep } from './api.js';
+import { getProvider } from './providers/index.js';
 import { formatToolResult } from '../types.js';
-import { TTL_1H } from './utils.js';
-
-const REDUNDANT_INSIDER_FIELDS = ['issuer'] as const;
 
 const InsiderTradesInputSchema = z.object({
   ticker: z
@@ -45,20 +42,7 @@ export const getInsiderTrades = new DynamicStructuredTool({
   description: `Retrieves insider trading transactions for a given company ticker. Insider trades include purchases and sales of company stock by executives, directors, and other insiders. This data is sourced from SEC Form 4 filings. Use filing_date filters to narrow down results by date range. Use the name parameter to filter by a specific insider.`,
   schema: InsiderTradesInputSchema,
   func: async (input) => {
-    const params: Record<string, string | number | undefined> = {
-      ticker: input.ticker.toUpperCase(),
-      limit: input.limit,
-      filing_date: input.filing_date,
-      filing_date_gte: input.filing_date_gte,
-      filing_date_lte: input.filing_date_lte,
-      filing_date_gt: input.filing_date_gt,
-      filing_date_lt: input.filing_date_lt,
-      name: input.name,
-    };
-    const { data, url } = await api.get('/insider-trades/', params, { cacheable: true, ttlMs: TTL_1H });
-    return formatToolResult(
-      stripFieldsDeep(data.insider_trades || [], REDUNDANT_INSIDER_FIELDS),
-      [url]
-    );
+    const { data, sources } = await getProvider().getInsiderTrades(input);
+    return formatToolResult(data, sources);
   },
 });

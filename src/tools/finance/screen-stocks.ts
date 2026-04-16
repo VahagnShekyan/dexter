@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { callLlm } from '../../model/llm.js';
 import { formatToolResult } from '../types.js';
 import { getCurrentDate } from '../../agent/prompts.js';
-import { api } from './api.js';
+import { getProvider } from './providers/index.js';
 
 /**
  * Rich description for the screen_stocks tool.
@@ -37,17 +37,8 @@ Screens for stocks matching financial criteria. Takes a natural language query d
 - For range queries (e.g., "between 10 and 20"), use two filters: gte + lte
 `.trim();
 
-// In-memory cache for screener filters (static model fields, rarely change)
-let cachedFilters: Record<string, unknown> | null = null;
-
 async function getScreenerFilters(): Promise<Record<string, unknown>> {
-  if (cachedFilters) {
-    return cachedFilters;
-  }
-
-  const { data } = await api.get('/financials/search/screener/filters/', {});
-  cachedFilters = data;
-  return data;
+  return getProvider().getScreenerFilters();
 }
 
 const ScreenerFilterSchema = z.object({
@@ -155,15 +146,15 @@ export function createScreenStocks(model: string): DynamicStructuredTool {
         );
       }
 
-      // Step 3: POST to screener API
+      // Step 3: POST to screener via active provider
       onProgress?.('Screening stocks...');
       try {
-        const { data, url } = await api.post('/financials/search/screener/', {
+        const { data, sources } = await getProvider().screenStocks({
           filters: filters.filters,
           currency: filters.currency,
           limit: filters.limit,
         });
-        return formatToolResult(data, [url]);
+        return formatToolResult(data, sources);
       } catch (error) {
         return formatToolResult(
           {
