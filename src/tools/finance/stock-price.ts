@@ -1,10 +1,10 @@
 import { DynamicStructuredTool } from '@langchain/core/tools';
 import { z } from 'zod';
-import { api } from './api.js';
+import { getProvider } from './providers/index.js';
 import { formatToolResult } from '../types.js';
 
 export const STOCK_PRICE_DESCRIPTION = `
-Fetches current stock price snapshots for equities, including open, high, low, close prices, volume, and market cap. Powered by Financial Datasets.
+Fetches current stock price snapshots for equities, including open, high, low, close prices, volume, and market cap.
 `.trim();
 
 const StockPriceInputSchema = z.object({
@@ -19,10 +19,8 @@ export const getStockPrice = new DynamicStructuredTool({
     'Fetches the current stock price snapshot for an equity ticker, including open, high, low, close prices, volume, and market cap.',
   schema: StockPriceInputSchema,
   func: async (input) => {
-    const ticker = input.ticker.trim().toUpperCase();
-    const params = { ticker };
-    const { data, url } = await api.get('/prices/snapshot/', params);
-    return formatToolResult(data.snapshot || {}, [url]);
+    const { data, sources } = await getProvider().getStockPriceSnapshot({ ticker: input.ticker });
+    return formatToolResult(data, sources);
   },
 });
 
@@ -44,18 +42,8 @@ export const getStockPrices = new DynamicStructuredTool({
     'Retrieves historical price data for a stock over a specified date range, including open, high, low, close prices and volume.',
   schema: StockPricesInputSchema,
   func: async (input) => {
-    const params = {
-      ticker: input.ticker.trim().toUpperCase(),
-      interval: input.interval,
-      start_date: input.start_date,
-      end_date: input.end_date,
-    };
-    // Cache when the date window is fully closed (OHLCV data is final)
-    const endDate = new Date(input.end_date + 'T00:00:00');
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const { data, url } = await api.get('/prices/', params, { cacheable: endDate < today });
-    return formatToolResult(data.prices || [], [url]);
+    const { data, sources } = await getProvider().getStockPrices(input);
+    return formatToolResult(data, sources);
   },
 });
 
@@ -64,7 +52,7 @@ export const getStockTickers = new DynamicStructuredTool({
   description: 'Retrieves the list of available stock tickers that can be used with the stock price tools.',
   schema: z.object({}),
   func: async () => {
-    const { data, url } = await api.get('/prices/snapshot/tickers/', {}, { cacheable: true, ttlMs: 24 * 60 * 60 * 1000 });
-    return formatToolResult(data.tickers || [], [url]);
+    const { data, sources } = await getProvider().getStockTickers();
+    return formatToolResult(data, sources);
   },
 });
