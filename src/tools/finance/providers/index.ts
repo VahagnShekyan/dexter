@@ -14,10 +14,15 @@
  */
 
 import { logger } from '../../../utils/logger.js';
+import { CoinGeckoProvider } from './coingecko/provider.js';
+import { CompositeProvider } from './composite.js';
+import { EdgarProvider } from './edgar/provider.js';
 import { FinancialDatasetsProvider } from './financialdatasets.js';
+import { FinnhubProvider } from './finnhub/provider.js';
+import { FmpProvider } from './fmp/provider.js';
 import type { DataProvider } from './types.js';
 
-export type ProviderName = 'fdatasets' | 'composite' | 'edgar' | 'finnhub' | 'fmp';
+export type ProviderName = 'fdatasets' | 'composite' | 'edgar' | 'finnhub' | 'fmp' | 'coingecko';
 
 const DEFAULT_PROVIDER: ProviderName = 'fdatasets';
 
@@ -28,19 +33,29 @@ function build(name: ProviderName): DataProvider {
     case 'fdatasets':
       return new FinancialDatasetsProvider();
     case 'composite':
+      return new CompositeProvider();
     case 'edgar':
+      return new EdgarProvider();
     case 'finnhub':
+      return new FinnhubProvider();
     case 'fmp':
-      // Not yet implemented — wired up in later steps of the migration.
-      logger.warn(`[providers] '${name}' provider not yet implemented; falling back to fdatasets`);
-      return new FinancialDatasetsProvider();
+      return new FmpProvider();
+    case 'coingecko':
+      return new CoinGeckoProvider();
   }
 }
 
 function resolveName(): ProviderName {
   const raw = (process.env.DATA_PROVIDER || '').trim().toLowerCase();
   if (!raw) return DEFAULT_PROVIDER;
-  if (raw === 'fdatasets' || raw === 'composite' || raw === 'edgar' || raw === 'finnhub' || raw === 'fmp') {
+  if (
+    raw === 'fdatasets' ||
+    raw === 'composite' ||
+    raw === 'edgar' ||
+    raw === 'finnhub' ||
+    raw === 'fmp' ||
+    raw === 'coingecko'
+  ) {
     return raw;
   }
   logger.warn(`[providers] unknown DATA_PROVIDER='${raw}'; falling back to '${DEFAULT_PROVIDER}'`);
